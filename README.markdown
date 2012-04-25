@@ -1,6 +1,5 @@
 ## CanvaSpace Game
 
-
 This is a (very early) experiment for writing a game in JavaScript using canvases. Currently all that is implemented
 is:
 
@@ -75,4 +74,5 @@ My intentions for the game are:
 
 ## Licence
 
-This code is GPLed. If you use any ideas, please link.
+This code is GPLed unless otherwise stated.
+If you use any ideas, please link.
