@@ -3,7 +3,24 @@
   
     <title>CanvaSpace Game Beginnings</title> 
     <style>
-      .explain p {
+      .face {
+        width: 100%;
+      }
+      .game {
+        float: left;
+        width: 600px;
+      }
+      .controls {
+        width: 20%;
+        float: left;
+        padding: 0px;
+        position: relative;
+        
+      }
+      .explain {
+        clear: both;
+      }
+      .controls p {
         text-align: right;
       }  
     </style>
@@ -102,82 +119,6 @@
 		this.decay = 1;
 
 	}		
-// Ball code stolen from http://www.wxs.ca/js/jsgravity/
-function Ball(x, y) {<!--{{{-->
-	this.x = x;
-	this.y = y;
-	this.vX = 0;
-	this.vY = 0;
-	this.mass=0.5;
-
-	this.fixed = false;
-	//var bod = document.getElementsByTagName("body")[0];
-	this.div = document.createElement("div");
-	this.div.innerHTML = "&#183;";
-
-	this.draw = function() {
-		ctx.save();
-		var oldFill = ctx.fillStyle;
-		ctx.fillStyle = "blue";
-		// ctx.arc(planet.x, planet.y, 20, 10, 0, true);
-		ctx.moveTo(this.x, this.y);
-		ctx.arc(this.x, this.y, 5, 10, 0, true);
-		ctx.fill();
-		ctx.restore();
-	}
-
-	this.step = function () {
-		if (!this.fixed) {
-			var fgX = 0;
-			var fgY = 0;
-			for(var i = 0; i < balls.length; i++) {
-				if (balls[i] == this) continue;
-				var dX = balls[i].x-this.x;
-				var dY = balls[i].y-this.y;
-				var theta = Math.atan2(dY,dX);
-				var rsq = dY*dY+dX*dX
-				if (rsq < 400) {
-					//var scale = Math.sqrt(rsq)/20;
-					this.x = balls[i].x-Math.cos(theta)*20;
-					this.y = balls[i].y-Math.sin(theta)*20;
-					rsq = 400;
-				}
-				var fg = G*this.mass*balls[i].mass/(rsq);
-				fgX += fg*Math.cos(theta);
-				fgY += fg*Math.sin(theta);
-			}
-		//	var currDate = new Date();
-			//var dTime = currDate.getTime()-this.lastStep.getTime();
-			this.vX += (fgX/this.mass)*(mspf);
-			this.vY += (fgY/this.mass)*(mspf);
-			this.x += this.vX*mspf;
-			this.y += this.vY*mspf;
-			
-			if (this.x < 25) {
-				this.x = 25;
-				this.vX = 0;
-			}
-			if (this.y < 25) {
-				this.y = 25;
-				this.vY = 0;
-			}
-			
-			if (this.x > width-25) {
-				this.x = width-25;
-				this.vX = 0;
-			}
-			if (this.y > height-25) {
-				this.y = height-25;
-				this.vY = 0;
-			}	
-		}
-		
-	}
-
-
-}<!--}}}-->
-
-
 
 	planet = function() {
 		mass.apply(this);
@@ -1260,37 +1201,6 @@ function Ball(x, y) {<!--{{{-->
      bounding ^= 1;
    }
 
-      // code that taught me how to use canvas
-      function draw() {
-        var ctx = document.getElementById('canvas').getContext('2d');
-        ctx.fillRect(0,0,600,400);
-        for (i=0;i<3;i++) {
-          for (j=0;j<3;j++) {
-            ctx.save();
-            ctx.strokeStyle = "#9CFF00";
-            ctx.translate(50+j*100,50+i*100);
-            drawSpirograph(ctx,20*(j+2)/(j+1),-8*(i+3)/(i+1),10);
-            ctx.restore();
-          }
-        }
-      }
-      function drawSpirograph(ctx,R,r,O){
-        var x1 = R-O;
-        var y1 = 0;
-        var i  = 1;
-        ctx.beginPath();
-        ctx.moveTo(x1,y1);
-        do {
-          if (i>20000) break;
-          var x2 = (R+r)*Math.cos(i*Math.PI/72) - (r+O)*Math.cos(((R+r)/r)*(i*Math.PI/72))
-          var y2 = (R+r)*Math.sin(i*Math.PI/72) - (r+O)*Math.sin(((R+r)/r)*(i*Math.PI/72))
-          ctx.lineTo(x2,y2);
-          x1 = x2;
-          y1 = y2;
-          i++;
-        } while (x2 != R-O && y2 != 0 );
-        ctx.stroke();
-      }
     </script>
     <style type="text/css">
       body { margin: 20px; font-family: arial,verdana,helvetica; background: #fff;}
@@ -1300,10 +1210,11 @@ function Ball(x, y) {<!--{{{-->
   </head><body onload="setup();/*draw();*/">
 
     <h1>CanvaSpace - beginnings of a game</h1>
-    <div>
+  <div class="face">
+    <div class="game">
       <canvas id="canvas" width="600" height="400"></canvas>
     </div>
-  <div class="explain">
+  <div class="controls">
   <p>Controls</p>
   <ul>
     <li><strong>W, A, S, D</strong> Movement</li> 
@@ -1311,6 +1222,9 @@ function Ball(x, y) {<!--{{{-->
     <li><strong>N</strong> Fire <em>(Bomber only)</em></li>
     <li><a href="" onclick="toggleBounding();return false;">Toggle Bounding circles</a></li>
   </ul>
+  </div>
+  </div>
+  <div class="explain">
     <p>The triangles are 'fighters' and the rectangles are 'bombers'.</p>
     <p>A small squadron of fighters attempts to follow the big fighter.</p>
     <p>Ships have multiple collision zones. The fighter has one for the cockpit and engines.</p>
