@@ -1,0 +1,1320 @@
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  
+    <title>CanvaSpace Game Beginnings</title> 
+    <style>
+      .explain p {
+        text-align: right;
+      }  
+    </style>
+
+    <script type="application/x-javascript">
+	/**
+	Sam Squire's Space Game
+
+	Resources used:
+		Started with:
+			http://www.flashninjaclan.com/tutorialpage.php?ID=42
+
+		http://asgamer.com/?
+			http://asgamer.com/?s=bullets&x=0&y=0
+		http://www.edenwaith.com/products/pige/tutorials/collision.php
+		http://compsci.ca/v3/viewtopic.php?t=14897	
+		https://developer.mozilla.org/En/Using_web_workers
+		http://billmill.org/static/canvastutorial/ball.html		
+		https://developer.mozilla.org/en/Canvas_tutorial
+		http://www.javascriptkit.com/
+
+		http://stackoverflow.com/questions/365284/howto-avoid-image-cutoff-with-canvas-rotate
+		http://stackoverflow.com/questions/2761100/html5-canvas-how-to-make-a-loading-spinner-by-rotating-the-image-in-degrees
+
+		http://www.blobsallad.se/	
+
+		http://www.mathwarehouse.com/geometry/circle/tangents-two-circles-distance.html
+
+
+		http://html5.litten.com/understanding-save-and-restore-for-the-canvas-context/
+		http://www.cambiaresearch.com/c4/702b8cd1-e5b0-42e6-83ac-25f0306e3e25/Javascript-Char-Codes-Key-Codes.aspx
+
+		MOST COMMON MISTAKES
+			forgetting to change an X to a Y when duplicating code	
+			passing a constructor of an event rather than an instance of the event to the add_delayed
+		
+
+	  */
+
+
+	var ticker;
+	var ctx, canvas;
+	var width, height;
+	var xLimit, yLimit;
+	var rads = Math.PI / 180;
+	var degs = Math.PI * 180;
+	var engine;
+	var ticks = 100000;
+	var G = 1;
+	var mspf = 2;
+
+	// javascript:var sx = Math.sin(63*Math.PI / 180 );alert( sx + "  y:" + -Math.cos(63*Math.PI / 180 ) + " inv" + Math.asin(sx) * 180 / Math.PI ); 
+
+	var planets = [];
+	var events = [];
+	var ships = [];
+	var fleet = [];
+
+	var weapons = [];
+	var bounding = false; /* show bounding circles */
+	
+
+	inputs = {
+		up: false,
+		down: false,
+		left: false,
+		right: false,
+		shoot: false,
+		next_ship: false
+		
+	};
+
+
+	weapon_recharge = function(delay, ship) {
+		this.target = ticks-delay;	
+		this.run = function() {
+			ship.canfire = true;
+		}
+	}
+
+
+	mass = function() {
+		this.mass = 0.5;	
+		this.owner = null;
+		this.name = "NONAME_MASS";
+		this.thrustpower = 10;
+		this.minthrust = -20;
+		this.maxthrust = 20;
+		this.rotation = 0;
+		this.hitzones = [];
+		this.x = 60;
+		this.y = 70;
+		this.xspeed = 0;
+		this.yspeed = 0;
+		this.lrthrust = 10;
+		this.decay = 1;
+
+	}		
+// Ball code stolen from http://www.wxs.ca/js/jsgravity/
+function Ball(x, y) {<!--{{{-->
+	this.x = x;
+	this.y = y;
+	this.vX = 0;
+	this.vY = 0;
+	this.mass=0.5;
+
+	this.fixed = false;
+	//var bod = document.getElementsByTagName("body")[0];
+	this.div = document.createElement("div");
+	this.div.innerHTML = "&#183;";
+
+	this.draw = function() {
+		ctx.save();
+		var oldFill = ctx.fillStyle;
+		ctx.fillStyle = "blue";
+		// ctx.arc(planet.x, planet.y, 20, 10, 0, true);
+		ctx.moveTo(this.x, this.y);
+		ctx.arc(this.x, this.y, 5, 10, 0, true);
+		ctx.fill();
+		ctx.restore();
+	}
+
+	this.step = function () {
+		if (!this.fixed) {
+			var fgX = 0;
+			var fgY = 0;
+			for(var i = 0; i < balls.length; i++) {
+				if (balls[i] == this) continue;
+				var dX = balls[i].x-this.x;
+				var dY = balls[i].y-this.y;
+				var theta = Math.atan2(dY,dX);
+				var rsq = dY*dY+dX*dX
+				if (rsq < 400) {
+					//var scale = Math.sqrt(rsq)/20;
+					this.x = balls[i].x-Math.cos(theta)*20;
+					this.y = balls[i].y-Math.sin(theta)*20;
+					rsq = 400;
+				}
+				var fg = G*this.mass*balls[i].mass/(rsq);
+				fgX += fg*Math.cos(theta);
+				fgY += fg*Math.sin(theta);
+			}
+		//	var currDate = new Date();
+			//var dTime = currDate.getTime()-this.lastStep.getTime();
+			this.vX += (fgX/this.mass)*(mspf);
+			this.vY += (fgY/this.mass)*(mspf);
+			this.x += this.vX*mspf;
+			this.y += this.vY*mspf;
+			
+			if (this.x < 25) {
+				this.x = 25;
+				this.vX = 0;
+			}
+			if (this.y < 25) {
+				this.y = 25;
+				this.vY = 0;
+			}
+			
+			if (this.x > width-25) {
+				this.x = width-25;
+				this.vX = 0;
+			}
+			if (this.y > height-25) {
+				this.y = height-25;
+				this.vY = 0;
+			}	
+		}
+		
+	}
+
+
+}<!--}}}-->
+
+
+
+	planet = function() {
+		mass.apply(this);
+		this.mass = 20;
+		this.x = width/2;
+		this.y = height/2;
+
+		this.scale = 2;
+		
+		this.solid = new hitzone("solid", this);
+		this.solid.x = this.x;	
+		this.solid.y = this.y;	
+		this.solid.size = 5;
+		this.hitzones.push(this.solid);
+
+		this.draw = function() {
+			/**
+			PLANET drawing routine
+			  */
+			var planet = this; var solid = this.solid;
+			ctx.save();
+			var planet = this;	
+			var oldFill = ctx.fillStyle;
+			ctx.fillStyle = 'blue';
+			ctx.moveTo(planet.x, planet.y);
+
+			solid.x = planet.x;
+			solid.y = planet.y;
+
+			ctx.translate(planet.x, planet.y);
+			ctx.scale(this.scale, this.scale);
+			ctx.translate(-planet.x, -planet.y);
+
+			ctx.arc(planet.x, planet.y, this.solid.size, 10, 0, true);
+			ctx.fill();
+			ctx.fillStyle = oldFill;
+			ctx.restore();
+
+		}	
+
+
+	}		
+	
+	// default vessel configuration
+	vessel = function() {
+
+		mass.apply(this);
+		this.hasthrusted = false;
+		this.thrust = function() {
+			var ship = this;
+			if (ship.hasthrusted) {
+				alert("Ship has thrusted twice on one iteration.");
+			}
+
+			if (ship.accel < 4) {
+				ship.accel++;
+			}
+			
+			// accelerate
+			if ( (ship.accel <= ship.maxthrust) || (ship.xspeed > ship.minthrust && ship.xspeed < ship.maxthrust ) )  {
+				ship.xspeed += Math.sin(ship.rotation * rads) * ship.thrustpower;
+			}
+
+			if ( (ship.accel <= ship.maxthrust) || ( (ship.yspeed > ship.minthrust) && (ship.yspeed < ship.maxthrust)) ) {
+				ship.yspeed += -Math.cos(ship.rotation * rads) * ship.thrustpower; 
+			}
+			this.hasthrusted = true;	
+			
+		};
+
+		this.nothrust = function() { // absence of thrust
+			var ship = this;
+			ship.accel--;		
+			ship.xspeed *= ship.decay;	
+			ship.yspeed *= ship.decay;	
+		} 
+
+		this.tick = function() {
+			this.x += this.xspeed;
+			this.y += this.yspeed;
+
+		}
+
+		this.accel = 0;
+		this.actions = [];
+		this.ai = {};
+		this.controlled = false;
+		this.canfire = false;
+		this.draw = function() {};
+
+	}
+
+	hitzone = function(name, owner) {
+		this.name = name;
+		this.owner = owner;
+		this.size = 0;	
+		this.x = 0;
+		this.y = 0;
+
+	}
+
+	plasma_ball = function() {<!--{{{-->
+		
+		mass.apply(this);
+		this.thrustpower = 0.7;
+		this.minthrust = -10;
+		this.maxthrust = 10;
+
+		this.lethal = new hitzone("plasmaball", this);
+		this.lethal.x = this.x;	
+		this.lethal.y = this.y;	
+		this.lethal.size = 3;
+		this.hitzones.push(this.lethal);
+
+		this.draw = function() {
+
+			/**
+			PLASMA BALL drawing routine
+			  */
+			var bullet = this; var lethal = this.lethal;
+			ctx.save();
+			ctx.strokeStyle = 'green';	
+			ctx.fillStyle = 'orange';
+			ctx.beginPath();
+			var avgx = bullet.x;
+			var avgy = bullet.y;
+			ctx.translate(avgx, avgy);
+			ctx.rotate(bullet.rotation * rads);
+			ctx.translate(-avgx, -avgy);
+
+			ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI*2, true );
+			ctx.closePath();
+			ctx.stroke();	
+			ctx.fill();
+
+			// update bounding
+			lethal.x = avgx;
+			lethal.y = avgy;
+
+			if (bounding) {
+				// bounding circle
+				ctx.strokeStyle = 'blue';
+				ctx.arc(lethal.x, lethal.y, lethal.size, 10, 0, Math.PI*2, true);	
+				ctx.stroke();
+			}
+
+			ctx.restore();
+
+
+
+		}
+
+	}<!--}}}-->
+
+	
+
+	bomber = function(){<!--{{{-->
+		vessel.apply(this);
+		this.mass = 0.8;
+		this.name = "bomber";
+		this.canfire = true;
+
+		this.recharge_event = weapon_recharge;
+		this.weapon = plasma_ball; 
+		this.recharge = 15;
+		this.weaponx = 5;
+		this.weapony = 15; 
+		this.thrustpower = 0.1;
+
+		this.minthrust = -3;
+		this.maxthrust = 3;
+		this.rotation = 0;
+		this.x = 60;
+		this.y = 70;
+		this.lrthrust = 10;
+
+		this.central = new hitzone("central", this);
+		this.central.x = this.x; 
+		this.central.y = this.y;
+		this.central.size = 12;
+		this.hitzones.push(this.central);
+
+		this.decay = .87;
+		this.draw = function() {
+			/**
+			BOMBER draw routine
+			  */
+
+			var ship = this; var central = this.central;
+			ctx.save();
+			ctx.strokeStyle = "#9CFF00";
+			ctx.beginPath();
+
+			var avgx = ship.x + (10/2); 
+			var avgy = ship.y + (15/2);
+			central.x = avgx;
+			central.y = avgy;
+			
+			
+			ctx.translate(avgx, avgy);
+			ctx.rotate(ship.rotation * rads);
+			ctx.translate(-avgx, -avgy);
+
+
+			ctx.strokeRect(ship.x, ship.y, 10, 15);
+			
+
+			if (inputs.up) {
+				ctx.beginPath();
+				ctx.moveTo(ship.x, ship.y+15);
+				ctx.strokeStyle = 'red';
+				ctx.lineTo(avgx, avgy+15);	
+				ctx.lineTo(ship.x+10, ship.y+15);	
+				ctx.fillStyle = 'orange';
+				ctx.fill();
+				ctx.stroke();
+					
+			}
+			
+			ctx.restore();
+
+			if (bounding) {
+				ctx.restore();
+				ctx.strokeStyle = 'blue'	
+				ctx.arc(central.x, central.y, central.size, 10, 0, Math.PI*2, true);	
+				ctx.stroke();
+			}
+		}
+	};<!--}}}-->
+
+	fighter = function(){<!--{{{-->
+		vessel.apply(this);
+		this.mass = 0.3;
+		this.name = "fighter";
+		this.weapon = null;	
+		this.canfire = false;
+		this.thrustpower = 0.3;
+		this.weaponx = 5;
+		this.weapony = 15; 
+		this.minthrust = -3;
+		this.maxthrust = 3;
+		this.rotation = 0;
+		this.x = 60;
+		this.y = 70;
+		this.xspeed = 0;
+		this.yspeed = 0;
+		this.lrthrust = 15;
+		this.decay = .90;
+
+		this.scale = 1;
+
+
+	 	this.central = new hitzone('central', this);
+	 	this.central.x = this.x;
+	 	this.central.y = this.y;
+	 	this.central.size = 6 * this.scale;
+	 	this.hitzones.push(this.central);
+
+		this.cockpit = new hitzone('cockpit', this);
+		this.cockpit.x = this.x;
+		this.cockpit.y = this.y;
+		this.cockpit.size = 5 * this.scale;
+		this.hitzones.push(this.cockpit);
+
+		this.draw = function() {
+			/**
+			FIGHTER drawing routine
+			  */
+
+			var ship = this; var central = this.central;
+			var cockpit = this.cockpit;
+			ctx.save();
+			ctx.strokeStyle = "#9CFF00";
+			ctx.beginPath();
+			
+			size = 5;
+
+			// size *= this.scale;
+
+			var x1 = size + ship.x + Math.sin((90) * rads);
+			var y1 = (3* size) + ship.y - Math.cos((90) * rads);
+
+			var x2 = -size + ship.x + Math.sin((-90) * rads);
+			var y2 = (3 * size) + ship.y - Math.cos((-90) * rads);
+
+			var x3 = ship.x;
+			var y3 = ship.y;
+
+			var avgx = (x1 + x2 + x3)/3;
+			var avgy = (y1 + y2 + y3)/3;
+
+			// avgx *= this.scale;
+			// avgx *= this.scale;
+
+
+			central.x = avgx;
+			central.y = avgy;
+			
+			// what we want to move, the current cockpit position
+
+			var o = {x: ship.x, y: -size*this.scale + ship.y-(ship.y-avgy) }; oP = {x:avgx, y: avgy};
+
+			cockpit.x = oP.x + (o.x - oP.x) * Math.cos(ship.rotation*rads) - (o.y - oP.y) * Math.sin(ship.rotation*rads);
+			cockpit.y = oP.y + (o.x - oP.x) * Math.sin(ship.rotation*rads) + (o.y - oP.y) * Math.cos(ship.rotation*rads);
+
+
+			avgx = Math.round(avgx);
+			avgy = Math.round(avgy);
+
+			ctx.translate(avgx, avgy);
+			ctx.scale(this.scale, this.scale);
+			ctx.rotate(ship.rotation * rads);
+			ctx.translate(-avgx, -avgy);
+
+			var stackx = [x1, x2, x3];
+			var stacky = [y1, y2, y3];
+
+			for (var p =0; p < 3; p++) {
+				ctx.moveTo(avgx, avgy);	
+				ctx.lineTo(stackx[p], stacky[p]);
+			}
+
+
+			ctx.moveTo(x3, y3);
+			// right line
+			ctx.lineTo(x1,y1);
+
+			// changes to try fix scaling
+			// ctx.moveTo(ship.x, ship.y);
+
+			ctx.moveTo(x3, y3);
+
+			// left line
+			ctx.lineTo(x2, y2);
+			// bottom
+			ctx.lineTo(x1, y1);
+			ctx.closePath();
+			ctx.stroke();
+
+			if (inputs.up && ship.controlled) {
+				ctx.beginPath();
+				ctx.moveTo(x1, y1);
+				ctx.strokeStyle = 'orange';
+				var outer = 3;
+				var inner = 5;
+				var middle = 8;
+				ctx.lineTo(x1-outer, y1+inner);
+				ctx.lineTo(avgx, y1+middle);
+				ctx.lineTo(x2+outer, y1+inner);
+				ctx.lineTo(x2, y2);
+				// ctx.lineTo(avgx, y1+ship.thrustpower*2);	
+				ctx.fillStyle = 'orange';
+				ctx.fill();
+				ctx.closePath();
+				ctx.stroke();
+			}
+			
+			ctx.restore();
+
+			if (bounding) {
+				ctx.save();
+				// ctx.arc(central.x, central.y, central.size, 10, 0, Math.PI*2, true);	
+				// ctx.arc(avgx, avgy, 6, 10, 0, Math.PI*2, true);	
+				
+				ctx.beginPath();
+				ctx.strokeStyle = 'blue';
+				// ctx.arc(avgx, ship.y, 3, 10, 0, Math.PI*2, true);	
+				ctx.closePath();
+				ctx.stroke();
+
+				ctx.beginPath();
+				ctx.strokeStyle = 'yellow';
+				ctx.arc(central.x, central.y, central.size, 10, 0, Math.PI*2, true);	
+				ctx.arc(cockpit.x, cockpit.y, cockpit.size, 10, 0, Math.PI*2, true);	
+				ctx.closePath();
+				ctx.stroke();
+
+				ctx.restore();
+			}
+
+
+		}
+	};//<!--}}}-->
+
+	// check the two hitzones
+	function collision_test(a, b) {<!--{{{-->
+		var dist = Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2);
+		return (dist <= Math.pow( a.size + b.size + 2, 2) );
+		
+	}<!--}}}-->
+
+	function find_collisions(what, ship) {<!--{{{-->
+		var a = ship;	
+		var aH = a.hitzones;				
+
+			// for all other objects
+
+			for (var j = 0; j < what.length; j++) {
+				var b = what[j];
+
+
+				if (b == a || b.owner === a ) {
+				       	continue;
+				}
+				
+				if (b.hitzones.length == 0) { 
+					continue;
+				}
+
+
+
+				var bH = b.hitzones;
+
+				for (var oz=0; oz < aH.length; oz++) {
+					var z1 = aH[oz];
+					for (var iz=0; iz < bH.length; iz++) {
+						var z2 = bH[iz];
+
+						// (b2.x - b1.x) * (b1.vx - b2.vx) + (b2.y - b1.y) * (b1.vy - b2.vy)	
+						var vector = (z1.x - z2.x) * (a.xspeed - b.xspeed) + (z1.y - z2.y) * (a.yspeed - b.yspeed);
+
+						var movingAway = (vector > 0);
+						if (what.weapons) {
+							var debugS = "the vector is " + vector; 
+						}
+
+
+						// getting close
+						if (!movingAway) {
+								// compare A hitzone to B hitzone
+								var hit = collision_test(z1, z2);
+								if (hit) return [j, z1, z2];
+
+						}
+						else {
+							continue;
+						}
+
+					}
+				}
+			}
+
+
+		return [];	
+	}<!--}}}-->
+
+	function setup() { // <!--{{{-->
+
+		engine = new Worker('worker.js');	
+		// engine.onmessage = engine_draw;
+
+		canvas = document.getElementById('canvas');
+		ctx = canvas.getContext('2d');
+		width = canvas.width; height = canvas.height;
+		xLimit = canvas.width-5; yLimit = canvas.height-5;
+
+		ctx.fillRect(0,0,600,400);
+
+		var b = new bomber();
+			b.controlled = true;
+		var f = new fighter();
+			f.controlled = false;
+			f.x = 200;
+			f.y = 300;
+
+		fleet.push(b); 
+		fleet.push(f);
+
+		var inner = 20;
+		var outer = 70;
+		var small = 5;
+
+
+		// consul
+		var alpha = new fighter();
+			alpha.follow = f;
+			alpha.x = f.x-outer;
+			alpha.y = f.y-5;
+			alpha.scale = 0.5
+			alpha.offset = [-outer, -small];
+
+		var beta = new fighter();
+			beta.follow = f;
+			beta.x = f.x - inner;
+			beta.y = f.y;
+			beta.offset = [-inner, 0];
+			beta.scale = 0.5
+
+		var gamma = new fighter();
+			gamma.follow = f;	
+			gamma.x = f.x + inner;
+			gamma.y = f.y;
+			gamma.offset = [inner, 0];
+			gamma.scale = 0.5
+
+		var epsilon = new fighter();
+			epsilon.aimove = true;
+			epsilon.follow = f;
+			epsilon.scale = 0.5;
+			epsilon.x = f.x + outer; 
+			epsilon.offset = [outer, small];
+			epsilon.y = f.y+small;
+
+			
+		
+		ships.push(gamma);
+		ships.push(epsilon);
+		ships.push(alpha);
+		ships.push(beta);
+
+		ships.push(b);
+		ships.push(f);
+
+		var earth = new planet();
+		earth.mass = 8;
+		earth.solid.size = 10;
+		planets.push(earth);
+
+
+		engine.postMessage("start");
+
+		ticker = setInterval(tick, 70);
+		document.onkeydown = handlekeydown;
+		document.onkeyup = handlekeyup;
+	}<!--}}}-->
+
+	
+
+	function handlekeydown(evt) { //<!--{{{-->
+		switch(evt.keyCode) {
+			case 65: {inputs.left=true;break;}	
+			case 87: {inputs.up=true;break;}	
+			case 68: {inputs.right=true;break;}	
+			case 83: {inputs.down=true;break;}
+			case 78: {inputs.fire=true;break;}
+			case 69: {inputs.next_ship=true;break;}
+
+		}
+	}<!--}}}-->
+
+
+	function handlekeyup(evt) {//<!--{{{-->
+		switch(evt.keyCode) {
+			case 65: {inputs.left=false;break;}	
+			case 87: {inputs.up=false;break;}	
+			case 68: {inputs.right=false;break;}	
+			case 83: {inputs.down=false;break;}
+			case 78: {inputs.fire=false;break;}
+			case 69: {inputs.next_ship=false;break;}
+		}
+	}<!--}}}-->
+
+	function add_delayed(delayed) {
+		events.push(delayed);		
+		events.sort(event_sorter);
+	}
+
+	function event_sorter(a, b) {
+		return b.target - a.target;	
+	}
+
+	function do_gravity(what, ship) {
+		var my = ship;
+		var fgX = 0;
+		var fgY = 0;
+
+		for (var s=0; s < what.length; s++) {
+			var well = what[s];
+			if (well == my) continue;
+			var dX = well.x-my.x;
+			var dY = well.y-my.y;
+
+			var theta = Math.atan2(dY, dX);		
+			card = Math.sqrt(card);
+
+			var card = Math.pow(dY, 2) + Math.pow(dX, 2);
+
+			if (card < 400) {
+				card = 400;
+			}
+
+			// Magitude of the force
+			var fg = G * ( (my.mass * well.mass) / card );
+			// construct r using the force multiplied by the direction
+			fgX += fg * Math.cos(theta);
+			fgY += fg * Math.sin(theta);
+		}
+
+// 		my.xspeed += (fgX/my.mass)*(mspf);
+// 		my.yspeed += (fgY/my.mass)*(mspf);
+// 		my.x += this.xspeed*mspf;
+// 		my.y += this.yspeed*mspf;
+
+                   var vX = (fgX/my.mass)*mspf;
+                   var vY = (fgY/my.mass)*mspf;
+                   my.xspeed += vX * mspf;
+                   my.yspeed += vY * mspf;	
+	}
+
+
+	function handle_controls(ship) {
+		if (inputs.up) {
+			ship.thrust();
+		} else {
+			ship.nothrust();
+		}
+
+
+		if (inputs.left) {
+			ship.rotation -= ship.lrthrust;
+		}
+		if (inputs.right) {
+			ship.rotation += ship.lrthrust;
+		}
+
+		if (inputs.fire && ship.weapon != null && ship.canfire) {
+				
+			var weapon = new ship.weapon();
+			weapon.owner = ship;
+			weapon.rotation = ship.rotation;
+
+			weapon.x = ship.x + ship.weaponx;
+			weapon.y = ship.y + ship.weapony;
+
+			if (ship.recharge != null) {
+				ship.canfire = false;
+				var recharge = new ship.recharge_event(ship.recharge, ship);
+				add_delayed(recharge);
+			}
+			weapons.push(weapon);
+			
+		}
+
+
+		if (inputs.next_ship && fleet.length > 1) {
+				
+			var old = fleet.shift();
+			old.controlled = false;
+			fleet.push(old);
+			fleet[0].controlled = true;
+			inputs.next_ship = false;
+		}	
+
+			
+	}
+
+
+	function auto_control(ship) {
+		
+		// squadron AI
+		if (ship.follow != null) {
+			follow_control(ship);	
+		}
+					
+		
+	}	
+
+
+	// AI behaviours
+	ai_acquire_rotation = function(ship) {
+		this.type = "acquire_rotation";
+		var ai = ship.ai;
+
+		var followed = ship.follow;
+		var offset = ship.offset;			
+		var tX = followed.x+ship.offset[0];
+		var tY = followed.y+ship.offset[1];
+
+		var dX = tX-ship.x;
+		var dY = tY-ship.y;
+		ai.target = {x:tX, y:tY};
+			
+		ai.target.dist = function() {
+			var ai = this.ai.target;
+			// alert(ai);
+			// return Math.sqrt( (ai.x*ai.x)+(ai.y*ai.y) );
+			return Math.sqrt( Math.pow(this.x-ai.x, 2) + Math.pow(this.y-ai.y, 2));
+			
+		}
+
+		var dist = ai.target.dist.apply(ship) ;
+		
+
+		var theta = Math.atan2(dY, dX);
+		var angle = Math.round( 90 + (theta * 180 / Math.PI) );
+		// this is our target angle
+		ship.ai.angle = angle;
+			
+		this.run = function(flags) {
+			var decisions = [];
+			var rotation = new ai_rotation(ship, angle)
+			var movement = new ai_accel(ship);
+			movement.setup();
+
+			decisions.push(rotation);
+			decisions.push(movement);
+			return decisions;
+		}
+			
+	};
+
+	ai_rotation = function(ship, angle) {
+		this.type = "rotation";
+		this.angle = angle;
+		this.compensatory = false;
+
+		this.run = function(flags) {
+			// var ai = ship.ai;
+			var decisions = [];
+
+			if (this.compensatory) {
+				// alert("compensating angle!");
+			}
+			if (Math.abs(this.angle-ship.rotation) > 16 ) {
+				if (this.compensatory) flags.done = false;
+				// window.status = ship.rotation + "-->" + this.angle;
+
+				if (ship.rotation > this.angle) {
+					ship.rotation -= ship.lrthrust;
+				}			
+				else if (ship.rotation < this.angle) {
+					ship.rotation += ship.lrthrust;
+				}			
+
+			} else {
+				flags.done = true;
+			}
+
+			return decisions;
+		}
+		this.run({});
+
+	};
+
+	function distance(a, b) {
+		var dX = b.x-a.x;
+		var dY = b.y-a.y;
+		dX = Math.pow(dX, 2);
+		dY = Math.pow(dY, 2);
+		return Math.sqrt(dX + dY);
+
+	}
+
+	ai_accel = function(ship) {
+		this.type = "acceleration";
+		this.configured = false;
+		this.count = 0;
+		this.decisions = [];
+		this.ship = ship;
+
+		this.setup = function() {
+			var ship = this.ship;
+
+			if (this.configured) {
+				return;
+			} else {
+				this.configured = true;	
+			}
+			var ai = ship.ai;	
+			var dist = ship.ai.target.dist.apply(ship);	
+			var dX = Math.pow(ship.ai.target.x-ship.x, 2);
+			var dY = Math.pow(ship.ai.target.y-ship.y, 2);
+			dX = Math.sqrt(dX);
+			dY = Math.sqrt(dY);
+			
+			// if ((ship.xspeed > 0) && (ship.yspeed > 0)) {
+
+
+				var timeToX = Math.floor(dX / ship.xspeed);
+				var timeToY = Math.floor(dY / ship.yspeed);
+				
+				var finalX = ship.x + (timeToX * ship.xspeed);
+				var finalY = ship.y + (timeToY * ship.yspeed);
+
+				fakeship = function(template) {
+					this.x = template.x;		
+					this.y = template.y;		
+					this.xspeed = template.xspeed;
+					this.yspeed = template.yspeed;
+					this.accel = template.accel;
+					this.rotation = template.rotation;
+					this.hasthrusted = false;
+					this.maxthrust = template.maxthrust;
+					this.minthrust = template.minthrust;
+					this.thrustpower = template.thrustpower;
+				}
+
+				var previous = new fakeship(ship);
+
+				var prevtogo = 1000;
+				var togo = distance(previous, ai.target);
+
+				var movements = [];
+
+				while (prevtogo > togo) {
+					var upcoming = new fakeship(previous);		
+					ship.thrust.apply(upcoming); 
+					upcoming.hasthrusted = false; 
+					ship.tick.apply(upcoming);
+					movements.push(upcoming);
+					prevtogo = togo;
+					togo = distance(upcoming, ai.target);
+					previous = upcoming;
+				}	
+						
+				
+				var m = movements.length >> 2;
+					var movement = movements[m];
+					var prer = movement.rotation;
+					movement.rotation += 180;	
+					movement.rotation = movement.rotation % 360;		// apply reverse thrust
+
+					// alert("before rotation: " + prer + " flipped rotation " + movement.rotation);
+					ship.thrust.apply(movement);
+					ship.tick.apply(movement);
+					
+				//	alert(movement.xspeed + " " + movement.yspeed);
+					
+
+				var faceaway = new ai_rotation(ship, movement.rotation);
+				faceaway.compensatory = true;
+
+
+				var dethrust = new ai_deaccel(ship, 7);
+
+				this.decisions.push(faceaway);
+				this.decisions.push(dethrust);
+
+				this.count = m;
+
+			// }
+		}
+		
+		this.run = function(flags) {
+			var decisions = [];
+			if (!this.configured) this.configured();
+			var ship = this.ship;
+			var ai = ship.ai
+			var dist = ai.target.dist;
+
+			if (this.count > 0 && ship.accel < 4 ) {
+				ship.thrust();	
+			} else {
+				ship.nothrust();
+			}
+
+			this.count--;
+
+			if (this.count == 0) {
+				// alert("done accel!");
+				flags.done = true;
+				return this.decisions;
+			}
+
+			return decisions;
+		}
+	}
+
+	ai_deaccel = function(ship, times) {
+
+		this.count = times;
+
+		this.run = function(flags) {
+			var decisions = [];
+
+			if (this.count > 0) {
+				flags.done = false;
+				ship.thrust();
+			} else {
+				flags.done = true;
+			}
+
+			this.count--;
+			return decisions;
+		}
+
+	};
+
+	function follow_control(ship) {
+		if (ship.actions.length == 0) {
+			ship.actions.push( new ai_acquire_rotation(ship) );		
+		}
+		
+		var action = ship.actions[0];
+
+		if (ship.aimove) {
+			var act = "";
+			for (var a =0; a < ship.actions.length; a++) {
+				act += ship.actions[a].type + " ";
+			}
+			// window.status = act;
+		}
+
+
+
+		var flags = {done:true};
+		var decisions = action.run(flags);	
+
+		if (flags.done) { 
+			var finished = ship.actions.shift();
+		}
+
+
+		if (decisions.length > 0 ) {
+			for (var d=0; d < decisions.length; d++) {
+				var followup = decisions[d];
+				ship.actions.unshift( followup );
+
+			}
+		}
+
+
+	}
+
+	function tick() { // main loop
+			ticks--;
+			var done = [];						// events that have been executed
+			allEvents = "";
+			for (var e=0; e < events.length; e++) { // event loop<!--{{{-->
+				var next_event = events[e];
+				allEvents += " " + next_event.target;
+				if (next_event.target >= ticks) {
+					done.push(e);
+					next_event.run();
+					if (events.length == 0) {
+					       	ticks = 1000000;
+					}
+				} else if (next_event.target < ticks) {
+
+				}
+			}
+			for (var oe = 0; oe < done.length; oe++) {
+				events.splice(done[oe], 1);		
+			}
+			<!--}}}-->
+
+			// window.status = "evts: " + allEvents;
+				
+			// clear the screen for a new draw cycle
+			ctx.fillRect(0,0,600,400);
+
+		for (var p=0; p < planets.length; p++) {
+			var it  = planets[p];	
+			it.draw();
+		}
+
+		for (var s = 0; s < ships.length; s++) { // ship loop<!--{{{-->
+			var ship = ships[s];
+			ship.hasthrusted = false;
+
+				if (ship.controlled) {
+					handle_controls(ship);
+				}
+
+
+					
+				do_gravity(planets, ship);		
+
+				// fake_gravity(planets, ship);		
+
+				do_gravity(ships, ship);		
+
+				// all ships
+				ship.x += ship.xspeed; 
+				ship.y += ship.yspeed; 
+
+				// ships in the way
+				var collisions = find_collisions(ships, ship);
+
+
+				if (collisions.length > 0) {
+					ship.xspeed = 0;
+					ship.yspeed = 0;
+
+					var notifier = function(data) {
+						this.collisions = data;
+						this.target = ticks-2;
+						this.run = function() {
+						var a = this.collisions[1].owner.name + "'s" + this.collisions[1].name;  	
+						var b = this.collisions[2].owner.name + "'s" + this.collisions[2].name;  	
+						// window.status = "Collision between " + a + " and " + b;
+
+						}
+					}
+
+
+					// add_delayed(new notifier(collisions));
+				} else {
+
+				}	
+
+
+				var crashes = find_collisions(planets, ship);
+				if (crashes.length > 0) {
+				        ship.xspeed = -ship.xspeed;	
+				        ship.yspeed = -ship.xspeed;	
+				}
+
+				var hits = find_collisions(weapons, ship);
+
+				// alert(hits);
+				if (hits.length > 0) {
+					// kill the weapon
+					var attacker = hits[0];
+					var projectile = weapons[attacker];
+					weapons.splice(attacker, 1);
+					projectile.xspeed = 0;
+					projectile.yspeed = 0;
+					
+				}
+				if (!ship.controlled) {
+					auto_control(ship);
+				}
+				
+
+				if (ship.x < 5) {
+					ship.x = 5;
+					ship.xspeed = -(ship.xspeed*ship.decay);
+				}	
+				if (ship.y < 5) {
+					ship.y = 5;
+					ship.yspeed = -(ship.yspeed*ship.decay);
+				}
+				if (ship.x > xLimit) {
+					ship.x = xLimit;
+					ship.xspeed = -(ship.xspeed*ship.decay);
+				}
+				if (ship.y > yLimit) {
+					ship.y = yLimit;
+					ship.yspeed = -(ship.yspeed*ship.decay);
+				}
+
+				
+
+			ship.draw();
+
+			// clearInterval(ticker);
+		}<!--}}}-->
+
+		for (var w=weapons.length-1;w >= 0; w--) {// weapon loop<!--{{{-->
+			weapon = weapons[w];
+
+			// max speed limitation
+			if (weapon.xspeed > weapon.minthrust && weapon.xspeed < weapon.maxthrust) {
+				weapon.xspeed += Math.sin(weapon.rotation * rads) * weapon.thrustpower;
+			} else {
+			}
+
+			if ( (weapon.yspeed > weapon.minthrust) && (weapon.yspeed < weapon.maxthrust)) {
+				weapon.yspeed += -Math.cos(weapon.rotation * rads) * weapon.thrustpower; 
+			} else {
+			}
+			
+			weapon.x += weapon.xspeed; 
+			weapon.y += weapon.yspeed; 
+
+			var remove = false;
+			// destroy weapons
+			if (weapon.x < 5) {
+				remove = true;
+			} else if (weapon.y < 5) {
+				remove = true;
+			} else if (weapon.x > xLimit) {
+				remove = true;
+			} else if (weapon.y > yLimit) {
+				remove = true;
+			}
+			if (!remove) {
+				weapon.draw();
+			} else {
+				// remove the projectile
+				weapons.splice(w, 1);	
+			}
+
+		}<!--}}}-->
+
+	}
+   
+   function toggleBounding() {
+     bounding ^= 1;
+   }
+
+      // code that taught me how to use canvas
+      function draw() {
+        var ctx = document.getElementById('canvas').getContext('2d');
+        ctx.fillRect(0,0,600,400);
+        for (i=0;i<3;i++) {
+          for (j=0;j<3;j++) {
+            ctx.save();
+            ctx.strokeStyle = "#9CFF00";
+            ctx.translate(50+j*100,50+i*100);
+            drawSpirograph(ctx,20*(j+2)/(j+1),-8*(i+3)/(i+1),10);
+            ctx.restore();
+          }
+        }
+      }
+      function drawSpirograph(ctx,R,r,O){
+        var x1 = R-O;
+        var y1 = 0;
+        var i  = 1;
+        ctx.beginPath();
+        ctx.moveTo(x1,y1);
+        do {
+          if (i>20000) break;
+          var x2 = (R+r)*Math.cos(i*Math.PI/72) - (r+O)*Math.cos(((R+r)/r)*(i*Math.PI/72))
+          var y2 = (R+r)*Math.sin(i*Math.PI/72) - (r+O)*Math.sin(((R+r)/r)*(i*Math.PI/72))
+          ctx.lineTo(x2,y2);
+          x1 = x2;
+          y1 = y2;
+          i++;
+        } while (x2 != R-O && y2 != 0 );
+        ctx.stroke();
+      }
+    </script>
+    <style type="text/css">
+      body { margin: 20px; font-family: arial,verdana,helvetica; background: #fff;}
+      canvas { border: 2px solid #000; float: left; margin-right: 20px; margin-bottom: 20px; }
+    </style>
+
+  </head><body onload="setup();/*draw();*/">
+
+    <h1>CanvaSpace - beginnings of a game</h1>
+    <div>
+      <canvas id="canvas" width="600" height="400"></canvas>
+    </div>
+  <div class="explain">
+  <p>Controls</p>
+  <ul>
+    <li><strong>W, A, S, D</strong> Movement</li> 
+    <li><strong>E</strong> Change Ship</li> 
+    <li><strong>N</strong> Fire <em>(Bomber only)</em></li>
+    <li><a href="" onclick="toggleBounding();return false;">Toggle Bounding circles</a></li>
+  </ul>
+    <p>The triangles are 'fighters' and the rectangles are 'bombers'.</p>
+    <p>A small squadron of fighters attempts to follow the big fighter.</p>
+    <p>Ships have multiple collision zones. The fighter has one for the cockpit and engines.</p>
+    <p>The planet is a (buggy) gravity well.</p>
+    <p>My vision for the game can be found on Github, <a href="https://github.com/fuz/canvaspace/">github/fuz/canvaspace</a>.</p>
+  </div>
+  </body></html>
