@@ -567,7 +567,7 @@
 
 	function setup() { // <!--{{{-->
 
-		engine = new Worker('worker.js');	
+		// engine = new Worker('worker.js');	
 		// engine.onmessage = engine_draw;
 
 		canvas = document.getElementById('canvas');
@@ -638,7 +638,7 @@
 		planets.push(earth);
 
 
-		engine.postMessage("start");
+		// engine.postMessage("start");
 
 		ticker = setInterval(tick, 70);
 		document.onkeydown = handlekeydown;
